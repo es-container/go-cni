@@ -18,6 +18,7 @@ package cni
 
 import (
 	"context"
+	"fmt"
 
 	cnilibrary "github.com/containernetworking/cni/libcni"
 	"github.com/containernetworking/cni/pkg/types/current"
@@ -38,7 +39,22 @@ func (n *Network) Attach(ctx context.Context, ns *Namespace) (*current.Result, e
 }
 
 func (n *Network) Remove(ctx context.Context, ns *Namespace) error {
-	return n.cni.DelNetworkList(ctx, n.config, ns.config(n.ifName))
+	var (
+		errs    = &errWrap{}
+		plugins = n.config.Plugins
+	)
+
+	for i := len(plugins) - 1; i >= 0; i-- {
+		net := plugins[i]
+		if err := n.cni.DelNetwork(ctx, net, ns.config(n.ifName)); err != nil {
+			errs.addError(fmt.Errorf("plugin %s failed (delete): %v ", net.Network.Name, err))
+		}
+	}
+	if errs.isNil() {
+		return nil
+	}
+	return errs
+
 }
 
 type Namespace struct {

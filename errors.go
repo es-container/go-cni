@@ -17,6 +17,9 @@
 package cni
 
 import (
+	"bytes"
+	"container/list"
+
 	"github.com/pkg/errors"
 )
 
@@ -52,4 +55,32 @@ func IsReadFailure(err error) bool {
 // IsInvalidResult return true if the error is due to invalid cni result
 func IsInvalidResult(err error) bool {
 	return errors.Is(err, ErrInvalidResult)
+}
+
+type errWrap struct {
+	errors *list.List
+}
+
+func (ew *errWrap) isNil() bool {
+	return ew.errors == nil
+}
+
+func (ew *errWrap) Error() string {
+	if ew.errors == nil {
+		return ""
+	}
+	var buf = &bytes.Buffer{}
+	for ele := ew.errors.Front(); ele != nil; ele = ele.Next() {
+		if err, ok := ele.Value.(error); ok {
+			buf.WriteString(err.Error())
+		}
+	}
+	return buf.String()
+}
+
+func (ew *errWrap) addError(err error) {
+	if ew.errors == nil {
+		ew.errors = list.New()
+	}
+	ew.errors.PushBack(err)
 }
